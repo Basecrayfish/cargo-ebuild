@@ -62,7 +62,6 @@ fn resolve<'a>(
     Ok((packages, resolve))
 }
 
-// Feature fns start
 fn all_features(package: &Package) -> &FeatureMap {
     package.manifest()
         .summary()
@@ -73,7 +72,6 @@ fn default_features(package: &Package) -> Vec<String> {
     all_features(package)
         .get("default")
         .unwrap_or(&Vec::new())
-//        .to_vec()
         .iter()
         .map(|default| default.to_string(package.manifest().summary()))
         .collect()
@@ -97,7 +95,7 @@ fn feature_to_iuse(package: &Package) -> String {
         s += feature.as_str();
         s += " ";
     }
-    s
+    s.trim_end().to_string()
 }
 
 fn feature_to_usex(package: &Package) -> String {
@@ -105,10 +103,14 @@ fn feature_to_usex(package: &Package) -> String {
     let features = features_no_default(package);
     for feature in  features {
         s += &format!("$(usex {} \"{},\" \"\")", feature, feature);
+    } 
+    if s.is_empty() {
+        s
+    } else {
+        let result = " --no-default-features \\\n\t\t--features ".to_string() + &s.to_string();
+        result
     }
-    s
 }
-// Feature fns end
 
 pub fn run(verbose: u32, quiet: bool) -> CliResult {
     // create a default Cargo config
@@ -125,7 +127,6 @@ pub fn run(verbose: u32, quiet: bool) -> CliResult {
         false,
         &None,
         &[]
-//        &["minimal-versions".to_string()],
     )?;
 
     // Load the workspace and current package
