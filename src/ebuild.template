@@ -21,8 +21,7 @@ SLOT="0"
 KEYWORDS="~amd64 ~x86"
 IUSE="{iuse}"
 
-DEPEND=""
-RDEPEND="${DEPEND}"
+RDEPEND=""
 BDEPEND=""
 
 src_compile() {{

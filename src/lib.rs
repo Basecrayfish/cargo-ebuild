@@ -14,13 +14,13 @@ extern crate time;
 use cargo::core::registry::PackageRegistry;
 use cargo::core::resolver::Method;
 use cargo::core::{Package, PackageSet, Resolve, Workspace};
+use cargo::core::summary::FeatureMap;
 use cargo::ops;
 use cargo::util::{important_paths, CargoResult};
 use cargo::{CliResult, Config};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
-use std::collections::HashMap;
 
 /// Finds the root Cargo.toml of the workspace
 fn workspace(config: &Config) -> CargoResult<Workspace> {
@@ -31,7 +31,7 @@ fn workspace(config: &Config) -> CargoResult<Workspace> {
 /// Generates a package registry by using the Cargo.lock or creating one as necessary
 fn registry<'a>(config: &'a Config, package: &Package) -> CargoResult<PackageRegistry<'a>> {
     let mut registry = PackageRegistry::new(config)?;
-    registry.add_sources(&[package.package_id().source_id().clone()])?;
+    registry.add_sources(vec![package.package_id().source_id().clone()])?;
     Ok(registry)
 }
 
@@ -63,33 +63,38 @@ fn resolve<'a>(
 }
 
 // Feature fns start
-fn all_features(package: &Package) -> &HashMap<String, Vec<String>> {
+fn all_features(package: &Package) -> &FeatureMap {
     package.manifest()
         .summary()
         .features()
 }
 
-fn features_no_default(package: &Package) -> Vec<&String> {
-    all_features(package).keys()
-        .filter(|k| **k != "default".to_string())
-        .collect()
-}
-
 fn default_features(package: &Package) -> Vec<String> {
     all_features(package)
         .get("default")
-        .unwrap_or(&vec!["".to_string()])
-        .to_vec()
+        .unwrap_or(&Vec::new())
+//        .to_vec()
+        .iter()
+        .map(|default| default.to_string(package.manifest().summary()))
+        .collect()
+}
+
+fn features_no_default(package: &Package) -> Vec<String> {
+    all_features(package).keys()
+        .map(|k| k.to_string())
+        .filter(|k| *k != "default".to_string())
+        .collect()
 }
 
 fn feature_to_iuse(package: &Package) -> String {
     let mut s = "".to_string();
     let defaults = default_features(package);
-    for feature in features_no_default(package) {
-        if defaults.contains(feature) {
+    let features = features_no_default(package);
+    for feature in features {
+        if defaults.contains(&feature) {
             s += "+";
         }
-        s += feature;
+        s += feature.as_str();
         s += " ";
     }
     s
@@ -97,7 +102,8 @@ fn feature_to_iuse(package: &Package) -> String {
 
 fn feature_to_usex(package: &Package) -> String {
     let mut s = "".to_string();
-    for feature in features_no_default(package) {
+    let features = features_no_default(package);
+    for feature in  features {
         s += &format!("$(usex {} \"{},\" \"\")", feature, feature);
     }
     s
