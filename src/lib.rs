@@ -124,7 +124,8 @@ pub fn run(verbose: u32, quiet: bool) -> CliResult {
         /* locked */
         false,
         &None,
-        &["minimal-versions".to_string()],
+        &[]
+//        &["minimal-versions".to_string()],
     )?;
 
     // Load the workspace and current package
