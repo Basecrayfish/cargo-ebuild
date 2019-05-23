@@ -20,6 +20,7 @@ use cargo::{CliResult, Config};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
+use std::collections::HashMap;
 
 /// Finds the root Cargo.toml of the workspace
 fn workspace(config: &Config) -> CargoResult<Workspace> {
@@ -60,6 +61,48 @@ fn resolve<'a>(
 
     Ok((packages, resolve))
 }
+
+// Feature fns start
+fn all_features(package: &Package) -> &HashMap<String, Vec<String>> {
+    package.manifest()
+        .summary()
+        .features()
+}
+
+fn features_no_default(package: &Package) -> Vec<&String> {
+    all_features(package).keys()
+        .filter(|k| **k != "default".to_string())
+        .collect()
+}
+
+fn default_features(package: &Package) -> Vec<String> {
+    all_features(package)
+        .get("default")
+        .unwrap_or(&vec!["".to_string()])
+        .to_vec()
+}
+
+fn feature_to_iuse(package: &Package) -> String {
+    let mut s = "".to_string();
+    let defaults = default_features(package);
+    for feature in features_no_default(package) {
+        if defaults.contains(feature) {
+            s += "+";
+        }
+        s += feature;
+        s += " ";
+    }
+    s
+}
+
+fn feature_to_usex(package: &Package) -> String {
+    let mut s = "".to_string();
+    for feature in features_no_default(package) {
+        s += &format!("$(usex {} \"{},\" \"\")", feature, feature);
+    }
+    s
+}
+// Feature fns end
 
 pub fn run(verbose: u32, quiet: bool) -> CliResult {
     // create a default Cargo config
@@ -142,6 +185,8 @@ pub fn run(verbose: u32, quiet: bool) -> CliResult {
         crates = crates.join(""),
         cargo_ebuild_ver = env!("CARGO_PKG_VERSION"),
         this_year = 1900 + time::now().tm_year,
+        iuse = feature_to_iuse(package),
+        cargo_features = feature_to_usex(package),
     ).expect("unable to write ebuild to disk");
 
     println!("Wrote: {}", ebuild_path.display());
